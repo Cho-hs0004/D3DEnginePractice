@@ -30,3 +30,8 @@
 *.exe
 *.out
 *.app
+
+#folders
+x64/
+packages/
+D3DBoxApp/x64
