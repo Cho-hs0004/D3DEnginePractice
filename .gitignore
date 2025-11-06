@@ -32,6 +32,7 @@
 *.app
 
 #folders
+.vs/
 x64/
 packages/
 D3DBoxApp/x64

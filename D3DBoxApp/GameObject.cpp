@@ -15,7 +15,7 @@ GameObject::~GameObject()
 
 }
 
-void GameObject::Create(RenderInfo rf)
+void GameObject::Create(RenderInfo* rf)
 {
-	m_RF = rf;
+	m_RF = *rf;
 }

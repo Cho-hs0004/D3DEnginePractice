@@ -822,7 +822,7 @@ struct App
 			}
         }
         
-        obj->Create(rf);
+        obj->Create(&rf);
 
         m_pObjs.push_back(obj);
     }
