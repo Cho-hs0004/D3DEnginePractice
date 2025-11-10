@@ -19,3 +19,22 @@ void GameObject::Create(RenderInfo* rf)
 {
 	m_RF = *rf;
 }
+
+
+
+
+
+
+
+
+/// //////////////////////////////////////////////
+/// Box
+void Box::Update(float dTime)
+{
+
+}
+
+void Box::SetGoal(Vector3 goal)
+{
+
+}

@@ -1,8 +1,9 @@
 ﻿
 
-
+#include "Timer.h"
 #include "Default.h"
 #include "GameObject.h"
+
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -112,7 +113,12 @@ struct App
     float                           m_ClickTimer = 0.0f;
 
     //GameObject
+    bool                                           m_bHeroCreated = false;
     std::vector<GameObject*> m_pObjs;
+	std::vector<std::vector<bool>> m_GridOccupy;
+	std::vector<std::vector<int>> m_GridObjID;
+
+	Box* m_pHero = nullptr;
 
     bool Init(HWND hWnd)
     {
@@ -122,6 +128,8 @@ struct App
         GetClientRect(hWnd, &rc);
         m_Width = rc.right - rc.left;
         m_Height = rc.bottom - rc.top;
+
+        InitTimer();
 
         // --------------------------------------------------------
         // 1. SwapChain 설정
@@ -211,7 +219,13 @@ struct App
 
         UpdateView();
 
+		m_GridOccupy = std::vector<std::vector<bool>>(m_HalfCells * 2, std::vector<bool>(m_HalfCells * 2, false));
+        m_GridObjID = std::vector<std::vector<int>>(m_HalfCells * 2, std::vector<int>(m_HalfCells * 2, -1));
+
+        CreateHero();
+
         OutputDebugString(L"[D3D] Init complete.\n");
+
         return true;
     }
 
@@ -545,6 +559,8 @@ struct App
 
     void UpdateAndDraw()
     {
+        float dTime = GetDeltaTime();
+
         float clear[4] = { 0.08f, 0.09f, 0.11f, 1.0f };
         m_Context->OMSetRenderTargets(1, m_RTV.GetAddressOf(), m_DSV.Get());
         m_Context->ClearRenderTargetView(m_RTV.Get(), clear);
@@ -705,6 +721,26 @@ struct App
         return true;
     }
 
+	bool IsOccupy(int x, int z)
+	{
+        if (!m_GridOccupy[x][z])
+        {
+            m_GridOccupy[x][z] = true;
+			return false;
+        }
+
+        RemoveBox(m_GridObjID[x][z]);
+        m_GridObjID[x][z] = -1;
+        m_GridOccupy[x][z] = false;
+
+		return true;
+	}
+
+    void PushBox(int x, int z, int id)
+    {
+		m_GridObjID[x][z] = id;
+    }
+
     Vector3 SnapToCellCenter(const Vector3& p)
     {
         float s = m_CellSize;
@@ -717,17 +753,46 @@ struct App
         return { cx, 0.0f, cz };
     }
 
+    void CreateHero()
+    {
+        Vector3 c = SnapToCellCenter(Vector3(0.1, 0, 0.1));
+
+        int cellX = c.x / m_CellSize + m_HalfCells;
+        int cellZ = c.z / m_CellSize + m_HalfCells;
+
+        if (IsOccupy(cellX, cellZ)) return;
+
+        Matrix S = Matrix::CreateScale(m_CellSize, 1.0f, m_CellSize);
+        Matrix T = Matrix::CreateTranslation(c);
+        int id = CreateBox(S * T, false);
+
+        m_pHero = dynamic_cast<Box*>(m_pObjs[0]);
+
+        if (!m_pHero)
+            return;
+
+        PushBox(cellX, cellZ, id);
+    }
+
     void OnClick(int mx, int my)
     {
-        Vector3 ro, rd; ScreenRay(mx, my, ro, rd);
-        Vector3 hit;
-        if (RayHitGround(ro, rd, hit))
-        {
-            Vector3 c = SnapToCellCenter(hit);
-            Matrix S = Matrix::CreateScale(m_CellSize, 1.0f, m_CellSize);
-            Matrix T = Matrix::CreateTranslation(c);
-            CreateBox(S * T, false);
-        }
+		Vector3 ro, rd; ScreenRay(mx, my, ro, rd);
+		Vector3 hit;
+		if (RayHitGround(ro, rd, hit))
+		{
+			Vector3 c = SnapToCellCenter(hit);
+
+			int cellX = c.x / m_CellSize + m_HalfCells;
+			int cellZ = c.z / m_CellSize + m_HalfCells;
+
+			if (IsOccupy(cellX, cellZ)) return;
+
+			Matrix S = Matrix::CreateScale(m_CellSize, 1.0f, m_CellSize);
+			Matrix T = Matrix::CreateTranslation(c);
+			int id = CreateBox(S * T, true);
+
+			PushBox(cellX, cellZ, id);
+		}
     }
 
 	void OnDBClick(int mx, int my)
@@ -737,11 +802,32 @@ struct App
 		if (RayHitGround(ro, rd, hit))
 		{
 			Vector3 c = SnapToCellCenter(hit);
+
+			int cellX = c.x / m_CellSize + m_HalfCells;
+			int cellZ = c.z / m_CellSize + m_HalfCells;
+
+			if (IsOccupy(cellX, cellZ)) return;
+
 			Matrix S = Matrix::CreateScale(m_CellSize, 1.0f, m_CellSize);
 			Matrix T = Matrix::CreateTranslation(c);
-            CreateBox(S * T, true);
+            int id = CreateBox(S * T, true);
+
+            PushBox(cellX, cellZ, id);
 		}
 	}
+
+    void RemoveBox(int id)
+    {
+        for(auto* box : m_pObjs)
+        {
+            if (box->GetID() == id)
+            {
+                delete box;
+                m_pObjs.erase(std::remove(m_pObjs.begin(), m_pObjs.end(), box), m_pObjs.end());
+                break;
+            }
+		}
+    }
 
     void UpdateView()
     {
@@ -792,9 +878,9 @@ struct App
             float(w) / float(h), 0.1f, 1000.0f);
     }
 
-    void CreateBox(Matrix mx, bool isGreenBox)
+    int CreateBox(Matrix mx, bool isGreenBox)
     {
-        GameObject* obj = new GameObject;
+        GameObject* obj = new Box;
 
         GameObject::RenderInfo rf{};
         rf.m_World = mx;
@@ -825,6 +911,8 @@ struct App
         obj->Create(&rf);
 
         m_pObjs.push_back(obj);
+
+        return obj->GetID();
     }
 };
 
