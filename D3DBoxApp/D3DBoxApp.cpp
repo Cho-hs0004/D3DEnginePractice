@@ -1,6 +1,7 @@
 ﻿
 
 #include "Timer.h"
+#include "Astar.h"
 #include "Default.h"
 #include "GameObject.h"
 
@@ -115,7 +116,7 @@ struct App
     //GameObject
     bool                                           m_bHeroCreated = false;
     std::vector<GameObject*> m_pObjs;
-	std::vector<std::vector<bool>> m_GridOccupy;
+	std::vector<std::vector<int>> m_GridOccupy;
 	std::vector<std::vector<int>> m_GridObjID;
 
 	Box* m_pHero = nullptr;
@@ -219,7 +220,7 @@ struct App
 
         UpdateView();
 
-		m_GridOccupy = std::vector<std::vector<bool>>(m_HalfCells * 2, std::vector<bool>(m_HalfCells * 2, false));
+		m_GridOccupy = std::vector<std::vector<int>>(m_HalfCells * 2, std::vector<int>(m_HalfCells * 2, 0));
         m_GridObjID = std::vector<std::vector<int>>(m_HalfCells * 2, std::vector<int>(m_HalfCells * 2, -1));
 
         CreateHero();
@@ -557,40 +558,43 @@ struct App
         m_Device->CreateSamplerState(&sd, m_Sampler.GetAddressOf());
     }
 
-    void UpdateAndDraw()
+    void Update(float dTime)
     {
-        float dTime = GetDeltaTime();
+        m_pHero->Update(dTime);
+    }
 
-        float clear[4] = { 0.08f, 0.09f, 0.11f, 1.0f };
-        m_Context->OMSetRenderTargets(1, m_RTV.GetAddressOf(), m_DSV.Get());
-        m_Context->ClearRenderTargetView(m_RTV.Get(), clear);
-        m_Context->ClearDepthStencilView(m_DSV.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+    void Draw(float dTime)
+    {
+		float clear[4] = { 0.08f, 0.09f, 0.11f, 1.0f };
+		m_Context->OMSetRenderTargets(1, m_RTV.GetAddressOf(), m_DSV.Get());
+		m_Context->ClearRenderTargetView(m_RTV.Get(), clear);
+		m_Context->ClearDepthStencilView(m_DSV.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
-        //“화면 크기(m_Width × m_Height) 영역 전체를 렌더링 대상으로 지정
-		// 매 프레임마다 뷰포트 설정을 할 필요는 없지만, 여기서는 명확히 하기 위해 매 프레임 설정
-        D3D11_VIEWPORT vp{ 0,0,(FLOAT)m_Width,(FLOAT)m_Height,0,1 };
-        m_Context->RSSetViewports(1, &vp);
+		//“화면 크기(m_Width × m_Height) 영역 전체를 렌더링 대상으로 지정
+	   // 매 프레임마다 뷰포트 설정을 할 필요는 없지만, 여기서는 명확히 하기 위해 매 프레임 설정
+		D3D11_VIEWPORT vp{ 0,0,(FLOAT)m_Width,(FLOAT)m_Height,0,1 };
+		m_Context->RSSetViewports(1, &vp);
 
-        // ---- Skybox ----
-        RenderSkybox();
+		// ---- Skybox ----
+		RenderSkybox();
 
-        // ---- Grid ----
-        m_Context->IASetInputLayout(m_InputLayoutColor.Get());
-        m_Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+		// ---- Grid ----
+		m_Context->IASetInputLayout(m_InputLayoutColor.Get());
+		m_Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
-        UINT stride = sizeof(VertexPC), offset = 0;
-        m_Context->IASetVertexBuffers(0, 1, m_GridVB.GetAddressOf(), &stride, &offset);
-        m_Context->VSSetShader(m_VSColor.Get(), nullptr, 0);
-        m_Context->PSSetShader(m_PSColor.Get(), nullptr, 0);
-        
-		MapAndSetCB(Matrix::Identity, m_View * m_Proj); 
-        
-        m_Context->Draw(m_GridVertexCount, 0);
+		UINT stride = sizeof(VertexPC), offset = 0;
+		m_Context->IASetVertexBuffers(0, 1, m_GridVB.GetAddressOf(), &stride, &offset);
+		m_Context->VSSetShader(m_VSColor.Get(), nullptr, 0);
+		m_Context->PSSetShader(m_PSColor.Get(), nullptr, 0);
 
-        // ---- Box ----
-        for (auto& pObj : m_pObjs)
-        {
-            auto&& rf = pObj->GetRenderInfo();
+		MapAndSetCB(Matrix::Identity, m_View * m_Proj);
+
+		m_Context->Draw(m_GridVertexCount, 0);
+
+		// ---- Box ----
+		for (auto& pObj : m_pObjs)
+		{
+			auto&& rf = pObj->GetRenderInfo();
 
 			m_Context->IASetInputLayout(rf.m_InputLayout.Get());
 			m_Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -609,11 +613,20 @@ struct App
 			MapAndSetCB(rf.m_World, m_View * m_Proj);
 
 			m_Context->DrawIndexed(rf.m_IndexCnt, 0, 0);
-        }
+		}
 
-        //----GreenBox-----
+		//----GreenBox-----
 
-        m_SwapChain->Present(1, 0);
+		m_SwapChain->Present(1, 0);
+    }
+
+    void UpdateAndDraw()
+    {
+        float dTime = GetDeltaTime();
+
+        Update(dTime);
+       
+        Draw(dTime);
     }
 
     void RenderSkybox()
@@ -723,15 +736,15 @@ struct App
 
 	bool IsOccupy(int x, int z)
 	{
-        if (!m_GridOccupy[x][z])
+        if (m_GridOccupy[x][z] == 0 || m_GridObjID[x][z] == m_pHero->GetID())
         {
-            m_GridOccupy[x][z] = true;
+            m_GridOccupy[x][z] = 1;
 			return false;
         }
 
         RemoveBox(m_GridObjID[x][z]);
         m_GridObjID[x][z] = -1;
-        m_GridOccupy[x][z] = false;
+        m_GridOccupy[x][z] = 0;
 
 		return true;
 	}
@@ -753,6 +766,7 @@ struct App
         return { cx, 0.0f, cz };
     }
 
+    //Hero Box
     void CreateHero()
     {
         Vector3 c = SnapToCellCenter(Vector3(0.1, 0, 0.1));
@@ -767,6 +781,8 @@ struct App
         int id = CreateBox(S * T, false);
 
         m_pHero = dynamic_cast<Box*>(m_pObjs[0]);
+
+		m_pHero->SetPos(Vector3(c.x, 0.0f, c.z));
 
         if (!m_pHero)
             return;
@@ -785,13 +801,23 @@ struct App
 			int cellX = c.x / m_CellSize + m_HalfCells;
 			int cellZ = c.z / m_CellSize + m_HalfCells;
 
-			if (IsOccupy(cellX, cellZ)) return;
+            Vector3 heroPos = SnapToCellCenter(m_pHero->GetPos());
 
-			Matrix S = Matrix::CreateScale(m_CellSize, 1.0f, m_CellSize);
-			Matrix T = Matrix::CreateTranslation(c);
-			int id = CreateBox(S * T, true);
+			int HeroX = heroPos.x / m_CellSize + m_HalfCells;
+			int HeroZ = heroPos.z / m_CellSize + m_HalfCells;
 
-			PushBox(cellX, cellZ, id);
+			m_GridOccupy[HeroX][HeroZ] = 0;
+
+            auto&& vPath = Astar::AStar(m_GridOccupy, HeroX, HeroZ, cellX, cellZ);
+
+            std::queue<std::pair<int, int>> pathq;
+
+            for (auto& p : vPath)
+            {
+				pathq.push(p);
+            }
+
+            m_pHero->SetPath(&pathq);
 		}
     }
 

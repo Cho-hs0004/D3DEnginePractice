@@ -16,6 +16,12 @@
     <Filter Include="세이더">
       <UniqueIdentifier>{e947764d-99ce-4602-bc60-aa0b7b5cab3a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Timer">
+      <UniqueIdentifier>{17db4cff-ed5d-4370-bd18-12623a88b282}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Astar">
+      <UniqueIdentifier>{f0db340c-17ba-483f-8696-d44de0083e7a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -36,6 +42,12 @@
     <ClInclude Include="Default.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="Timer.h">
+      <Filter>Timer</Filter>
+    </ClInclude>
+    <ClInclude Include="Astar.h">
+      <Filter>Astar</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D3DBoxApp.cpp">
@@ -43,6 +55,12 @@
     </ClCompile>
     <ClCompile Include="GameObject.cpp">
       <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Timer.cpp">
+      <Filter>Timer</Filter>
+    </ClCompile>
+    <ClCompile Include="Astar.cpp">
+      <Filter>Astar</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

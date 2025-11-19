@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <queue>
 #include <wrl.h>
 #include <d3d11.h>
 #include <dxgi.h>

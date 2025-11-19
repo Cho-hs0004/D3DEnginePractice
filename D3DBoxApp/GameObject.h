@@ -38,14 +38,31 @@ public:
 	void Create(RenderInfo* rf);
 	virtual void Update(float dTime) = 0;
 
+	void SetPos(const Vector3& pos) { m_Pos = pos; }
+
 	UINT GetID() { return m_id; }
+	Vector3 GetPos() { return m_Pos; }
 	Matrix GetMatrix() { return m_RF.m_World; }
 	const RenderInfo& GetRenderInfo() { return m_RF; }
 };
 
 class Box : public GameObject
 {
+protected:
+	std::queue<std::pair<int, int>> pathQ;
+
+	bool m_isMoving = false;
+
+	Vector3 m_TargetPos;
+	Vector3 m_vDir;
+
+	float m_Speed = 2.0f;
 public:
+	Box();
+	virtual ~Box();
+
 	virtual void Update(float dTime) override;
-	virtual void SetGoal(Vector3 goal);
+	virtual void SetPath(std::queue<std::pair<int, int>>* pathQ);
+
+	Vector3 GetTargetPos() { return m_TargetPos; }
 };
